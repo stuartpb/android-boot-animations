@@ -1,0 +1,6 @@
+720 64 24
+c 1 0 scroll
+c 1 0 blink
+c 1 0 blink
+c 0 0 blink
+c 0 0 fade

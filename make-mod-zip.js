@@ -4,15 +4,15 @@ var fs = require('fs');
 
 var fullSvg = fs.readFileSync('base.svg',{encoding:'utf8'});
 
-var caps = /^(.*)$TEXT_X_POSITION(.*)$TEXT_OPACITY(.*)$/.exec(fullSvg);
+var caps = /^([\s\S]*)\$TEXT_X_POSITION([\s\S]*)\$TEXT_OPACITY([\s\S]*)$/.exec(fullSvg);
 
 var preXBuf = new Buffer(caps[1]);
 var postOpacBuf = new Buffer(caps[3]);
 
-var midBuffer = new Buffer(caps[2]);
+var midBuf = new Buffer(caps[2]);
 
-var postXBuf = Buffer.concat([midBuffer,new Buffer('1'),postOpacBuffer]);
-var preOpacBuf = Buffer.concat([postOpacBuffer,new Buffer('-1309.1608'),midBuffer]);
+var postXBuf = Buffer.concat([midBuf,new Buffer('1'),postOpacBuf]);
+var preOpacBuf = Buffer.concat([postOpacBuf,new Buffer('-1309.1608'),midBuf]);
 
 var bazip = jszip();
 
@@ -20,43 +20,55 @@ function padded(n) {
   return ('000'+n).slice(-3);
 }
 
-var scrollFol = bazip.folder("scroll");
-var blinkFol = bazip.folder("blink");
-var fadeFol = bazip.folder("fade");
+function addFileToAnimation(path, buffer) {
+  //until I can track down the ZIP issue
+  fs.writeFileSync('out/' + path, buffer);
+  bazip.file(path, buffer);
+}
 
 function addScrollFrame(i) {
   var offset = 720 + (-2029.1608 / 120) * i;
-  gm.source(Buffer.concat([preXBuf,
-      new Buffer(offset.toString()),postXBuf]))
-    .toBuffer(function (err, buffer) {
+  var frameBuf = Buffer.concat([preXBuf,
+    new Buffer(offset.toString()),postXBuf])
+  gm(frameBuf,'frame.svg')
+    .toBuffer('png',function (err, buffer) {
     if (err) throw new Error(err);
-    else scrollFol.file(padded(i) + '.png', buffer);
+    else {
+      addFileToAnimation('scroll/' + padded(i) + '.png', buffer);
+    }
   });
+  //.write('out/scroll/'+ padded(i) + '.png',function(err){if (err) throw new Error(err);});
 }
 
 function addFadeOut(i) {
   var opacity = 1 - 0.1 * i;
-  gm.source(Buffer.concat([preXBuf,
-      new Buffer(opacity.toString()), postXBuf]))
-    .toBuffer(function (err, buffer) {
+  var frameBuf = Buffer.concat([preXBuf,
+    new Buffer(opacity.toString()), postXBuf]);
+
+  gm(frameBuf,'frame.svg')
+    .toBuffer('png',function (err, buffer) {
     if (err) throw new Error(err);
     else {
-      blinkFol.file(padded(i) + '.png', buffer);
-      fadeFol.file(padded(i) + '.png', buffer);
+      addFileToAnimation('blink/' + padded(i) + '.png',buffer);
+      addFileToAnimation('fade/' + padded(i) + '.png',buffer);
     }
   });
 }
 
 function addBlack(i) {
-  gm.source(Buffer.concat([preXBuf, new Buffer('0'), postXBuf]))
-    .toBuffer(function (err, buffer) {
+  var frameBuf = Buffer.concat([preXBuf, new Buffer('0'), postXBuf]);
+
+  gm(frameBuf,'frame.svg')
+    .toBuffer('png',function (err, buffer) {
     if (err) throw new Error(err);
     else {
-      blinkFol.file(padded(i) + '.png', buffer);
+      addFileToAnimation('blink/' + padded(i) + '.png',buffer);
+
       // Yes, I realize this is a ton of extra complexity
       // for the sake of rendering a completely black PNG.
+
       if (i == 10) {
-        fadeFol.file(padded(i) + '.png', buffer);
+        addFileToAnimation('blink/' + padded(i) + '.png',buffer);
       }
     }
   });
@@ -64,11 +76,15 @@ function addBlack(i) {
 
 function addFadeIn(i) {
   var opacity = (1/3) * (i-12);
-  gm.source(Buffer.concat([preXBuf,
-      new Buffer(opacity.toString()), postXBuf]))
-    .toBuffer(function (err, buffer) {
+  var frameBuf = Buffer.concat([preXBuf,
+    new Buffer(opacity.toString()), postXBuf]);
+
+  gm(frameBuf,'frame.svg')
+    .toBuffer('png',function (err, buffer) {
     if (err) throw new Error(err);
-    else blinkFol.file(padded(i) + '.png', buffer);
+    else {
+      addFileToAnimation('blink/' + padded(i) + '.png',buffer);
+    }
   });
 }
 
@@ -89,7 +105,10 @@ for (i = 13; i < 16; i++) {
 }
 
 
-bazip.file('desc.txt',fs.readFileSync('desc.txt'));
+bazip.file('desc.txt',fs.readFileSync('desc.txt','utf8'));
+
+//COMMENTME
+fs.writeFileSync('bootanimation.zip',bazip.generate({type:'nodebuffer'}));
 
 fs.writeFileSync('big-o-boot-mod.zip',
   jszip().file('system/media/bootanimation.zip',
