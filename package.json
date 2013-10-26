@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "jszip": "Stuk/jszip",
-    "gm": "~1.13.3"
+    "gm": "~1.13.3",
+    "queue-async": "~1.0.4"
   }
 }
